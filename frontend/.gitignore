@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
+
+# Browser e2e (Playwright) artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Tokens. Channel triplets (not hex) so Tailwind's <alpha-value> works and
+   utilities like `bg-alive/10` produce real translucency instead of a second
+   hard-coded colour.
+--------------------------------------------------------------------------- */
+:root {
+  /* Dark-only UI: native controls (checkboxes, selects, number spinners,
+     Firefox's scrollbars) are drawn in their dark appearance. */
+  color-scheme: dark;
+
+  --canvas:  10 10 12;
+  --surface: 18 18 21;
+  --raised:  26 26 30;
+  --overlay: 34 34 39;
+
+  --fg:        250 250 250;
+  --fg-muted:  161 161 170;
+  --fg-subtle: 113 113 122;
+
+  --line:        39 39 45;
+  --line-strong: 63 63 70;
+
+  --alive: 16 185 129;
+  --gone:  239 68 68;
+  --warn:  245 158 11;
+  --info:  96 165 250;
+}
+
+@layer base {
+  html {
+    background: rgb(var(--canvas));
+    color: rgb(var(--fg));
+    font-family: theme(fontFamily.sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { min-height: 100vh; }
+
+  /* Long-form copy needs a comfortable measure; the old design set the whole
+     document in monospace, including multi-paragraph explanations. */
+  p { max-width: 68ch; }
+
+  h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+
+  code, pre, .tabular { font-family: theme(fontFamily.mono); }
+  code { font-size: 0.9em; color: rgb(var(--fg)); }
+
+  ::selection { background: rgb(var(--alive) / 0.28); }
+
+  /* One focus treatment for every interactive element. Previously nothing in
+     the app rendered a focus ring at all, so keyboard navigation was invisible. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--alive));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* Pointer users shouldn't see the ring on click. */
+  :focus:not(:focus-visible) { outline: none; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: rgb(var(--canvas)); }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line-strong));
+    border-radius: 6px;
+    border: 2px solid rgb(var(--canvas));
+  }
+}
+
+@layer components {
+  /* ---------- surfaces ---------- */
+
+  /* Static container. No hover treatment: the previous global `.card:hover`
+     lifted every card on the page, including ones that weren't clickable,
+     which destroyed the signal that something is interactive. */
+  .card {
+    @apply rounded-lg border border-line bg-surface p-4 shadow-card;
+  }
+  /* Opt in per card that genuinely navigates or expands. */
+  .card-interactive {
+    @apply transition-[border-color,box-shadow,transform] duration-150
+           hover:border-line-strong hover:shadow-lift cursor-pointer;
+  }
+  .card-inset {
+    @apply rounded border border-line bg-canvas p-3;
+  }
+
+  /* ---------- buttons ---------- */
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded border border-line
+           bg-raised px-3 py-2 text-sm font-medium text-fg
+           transition-colors duration-150
+           hover:border-line-strong hover:bg-overlay
+           disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-raised
+           disabled:hover:border-line;
+  }
+  .btn-primary {
+    @apply border-transparent bg-alive text-canvas
+           hover:bg-alive/85 hover:border-transparent;
+  }
+  .btn-danger {
+    @apply border-gone/40 bg-transparent text-gone
+           hover:bg-gone/10 hover:border-gone;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-fg-muted
+           hover:bg-raised hover:text-fg hover:border-transparent;
+  }
+  .btn-sm { @apply px-2.5 py-1.5 text-xs; }
+  .btn-lg { @apply px-5 py-2.5 text-base; }
+
+  /* Selected state for preset/segmented groups. */
+  .btn-selected {
+    @apply border-alive/50 bg-alive/10 text-alive hover:bg-alive/15 hover:border-alive/60;
+  }
+
+  /* ---------- forms ---------- */
+
+  .input {
+    @apply w-full rounded border border-line bg-canvas px-3 py-2 text-sm text-fg
+           placeholder:text-fg-subtle transition-colors duration-150
+           hover:border-line-strong focus:border-alive;
+  }
+  .input-invalid { @apply border-gone/60 focus:border-gone; }
+  /* The focus ring of an invalid field is red too: green around a red border mixed the signals. */
+  .input-invalid:focus-visible,
+  [aria-invalid="true"]:focus-visible { outline-color: rgb(var(--gone)); }
+  .field { @apply space-y-1.5; }
+  .field-label { @apply block text-sm font-medium text-fg; }
+  .field-hint { @apply text-xs text-fg-muted; }
+  .field-error { @apply text-xs text-gone; }
+
+  /* ---------- status ---------- */
+
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
+           text-xs font-medium;
+  }
+  .pill-alive     { @apply border-alive/40 bg-alive/10 text-alive; }
+  .pill-dark      { @apply border-gone/40 bg-gone/10 text-gone; }
+  .pill-revealed  { @apply border-info/40 bg-info/10 text-info; }
+  .pill-cancelled { @apply border-line-strong bg-raised text-fg-muted; }
+  .pill-neutral   { @apply border-line-strong bg-raised text-fg-muted; }
+
+  /* Inline callout. One component for every advisory in the app, so severity
+     reads consistently instead of three bespoke warning boxes per page. */
+  .note {
+    @apply rounded-lg border p-3 text-sm;
+  }
+  .note-warn { @apply border-warn/35 bg-warn/[0.07] text-fg-muted; }
+  .note-danger { @apply border-gone/35 bg-gone/[0.07] text-fg-muted; }
+  .note-info { @apply border-info/30 bg-info/[0.07] text-fg-muted; }
+  .note-title { @apply mb-1 flex items-center gap-2 font-semibold text-fg; }
+
+  /* ---------- values ---------- */
+
+  /* Numeric readouts: monospace and tabular so digits don't reflow as a
+     countdown ticks. */
+  .tabular { font-variant-numeric: tabular-nums; }
+  .value { @apply font-mono tabular tracking-tight; }
+
+  /* ---------- layout ---------- */
+
+  .stack    { @apply space-y-6; }
+  .stack-sm { @apply space-y-3; }
+  .grid-2   { @apply grid grid-cols-1 gap-4 md:grid-cols-2; }
+  .grid-3   { @apply grid grid-cols-1 gap-4 md:grid-cols-3; }
+  .grid-4   { @apply grid grid-cols-2 gap-3 lg:grid-cols-4; }
+
+  .page-title { @apply text-2xl font-semibold tracking-tight; }
+  .page-lede  { @apply mt-1 text-sm text-fg-muted; }
+  .section-title { @apply text-lg font-semibold; }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion. Everything animated above is decorative, so honour the OS setting
+   outright rather than substituting a subtler animation.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

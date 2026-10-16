@@ -1,0 +1,34 @@
+{
+  "name": "deadmanswitch-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI + watcher daemon for the Zama fhEVM DeadManSwitch (public release only): AES-256-GCM envelope, FHE-encrypted data key, viem.",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "dms": "dist/index.js",
+    "dms-watcher": "dist/watcher.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "abi": "node tools/gen-abi.mjs",
+    "dms": "tsx src/index.ts",
+    "watcher": "tsx src/watcher.ts",
+    "e2e:local": "tsx src/e2e.ts"
+  },
+  "dependencies": {
+    "@zama-fhe/sdk": "3.6.0",
+    "dotenv": "^16.4.5",
+    "viem": "^2.57.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "3.2.4"
+  }
+}

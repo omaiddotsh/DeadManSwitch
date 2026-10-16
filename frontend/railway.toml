@@ -1,0 +1,25 @@
+# Railway: Next.js app + same-origin Zama relayer proxy (app/api/relayer).
+#
+# NOT applied automatically. Railway reads a config file only from the absolute
+# path set in the service settings (/frontend/railway.toml); it does not follow
+# Root Directory = frontend. Config-as-code is deprecated: new services cannot
+# opt in, and existing ones lose it on 2026-12-01. This file records the settings
+# to enter in the service dashboard (RAILWAY-DEPLOY.md §1); keep the two in sync.
+#
+# Service variables (see .env.example):
+#   build-time (public): NEXT_PUBLIC_CONTRACT_<1|11155111>, NEXT_PUBLIC_FROM_BLOCK_<…>,
+#                        NEXT_PUBLIC_RPC_URL_<…>, NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+#   runtime (secret):    ZAMA_RELAYER_API_KEY (or ZAMA_RELAYER_API_KEY_<chainId>)
+# NEXT_PUBLIC_* values are inlined at build time: redeploy after changing them.
+# Never set NEXT_PUBLIC_ENABLE_LOCAL_CHAIN in production.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm run start"
+healthcheckPath = "/"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -1,0 +1,32 @@
+{
+  "_comment": "Copy to watcher.config.json. Every key is optional and every value below is the default, so this file behaves exactly like no file. Keys starting with _ are ignored.",
+  "pollIntervalSec": 30,
+  "jitterPct": 10,
+  "outDir": "./released-secrets",
+  "stateFile": "./watcher-state.json",
+
+  "_discovery": "Scan SwitchCreated logs from FROM_BLOCK (env) or fromBlock here on the first run (set it to the contract's deploy block); later runs resume from the state file, scanning the last 64 blocks again in case of a reorganisation (not on local Anvil); --rescan-from <block> scans again from there.",
+  "discover": true,
+  "logChunkBlocks": 5000,
+  "_confirmations": "Optional \"confirmations\": blocks to stay behind the head while scanning (this only delays discovery; the 64-block re-scan is what survives deeper reorganisations). Unset = 0 on local Anvil, 2 elsewhere.",
+  "_switches": "Optional \"switches\": extra switches to watch besides discovered ones, e.g. [{ \"owner\": \"0x…\", \"id\": \"1\" }]; quote the id (JSON numbers above 2^53 are rounded). Default: none.",
+
+  "_economics": "Reveal only when bounty >= estimated gas x gas price x safetyFactor + minProfitEth (unless altruistic). revealGasEstimate is also the pre-check before asking the KMS.",
+  "altruistic": false,
+  "safetyFactor": 1.5,
+  "minProfitEth": "0",
+  "maxGasPriceGwei": "0",
+  "revealGasEstimate": 400000,
+  "publish": false,
+
+  "_transactions": "Wait this long for a receipt. A tx still pending on a later pass is replaced (same nonce, fees +12.5% or the market rate, capped by maxGasPriceGwei); a markDark / revealKey only while the bounty still pays at those fees. Otherwise it is left at its own fees, unless a later markDark / revealKey waits behind its nonce whose bounty also pays for freeing it: then a 0-value self-transfer frees the nonce and the action is given up.",
+  "txReceiptTimeoutSec": 120,
+
+  "_kms": "Public decryption after markDark: per-request timeout, attempts per pass, a time budget per pass, then exponential backoff.",
+  "decryptTimeoutSec": 120,
+  "decryptAttemptsPerPass": 2,
+  "decryptPassBudgetSec": 300,
+  "backoffBaseSec": 15,
+  "backoffMaxSec": 900,
+  "unprofitableRecheckSec": 600
+}

@@ -1,0 +1,49 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+script = "script"
+libs = ["dependencies"]
+solc_version = "0.8.28"
+# Cancun is required: FHE.checkSignatures caches verification in transient storage.
+evm_version = "cancun"
+optimizer = true
+# via_ir resolves "stack too deep" in createSwitch's multi-field event emit and
+# produces tighter runtime code. The contract is deployed once per chain and
+# called many times, so optimize for runtime cost over deploy size (verify the
+# EIP-170 margin with `forge build --sizes`).
+via_ir = true
+optimizer_runs = 1000000
+bytecode_hash = "none"
+cbor_metadata = false
+
+[fuzz]
+runs = 512
+
+[invariant]
+runs = 128
+depth = 64
+fail_on_revert = false
+
+[fmt]
+line_length = 120
+
+# Dependencies are managed by Soldeer (`forge soldeer install`), pinned in
+# soldeer.lock. Rationale for each pin: docs/fhevm-api-pins.md.
+[dependencies]
+forge-std = "1.14.0"
+"@fhevm-solidity" = "0.11.1"
+"@encrypted-types" = "0.0.4"
+forge-fhevm = { version = "3ee696f", git = "https://github.com/zama-ai/forge-fhevm.git", rev = "3ee696fba62a32314fde457de28cc29f1191c4cb" }
+
+[soldeer]
+remappings_generate = false
+remappings_version = false
+recursive_deps = false
+
+[lint]
+# - screaming-snake-case-immutable: `ethUsdPriceFeed`/`maxPriceAge` are public
+#   getters and part of the ABI the frontend/client use.
+# - asm-keccak256, unwrapped-modifier-logic: micro-optimisations not worth the
+#   readability cost in a contract meant to be audited.
+exclude_lints = ["screaming-snake-case-immutable", "asm-keccak256", "unwrapped-modifier-logic"]

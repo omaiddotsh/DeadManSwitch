@@ -1,0 +1,50 @@
+{
+  "name": "deadmanswitch-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "typecheck:lib": "tsc --noEmit -p tsconfig.lib.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "gen:abi": "node scripts/gen-abi.mjs",
+    "check:abi": "node scripts/gen-abi.mjs --check",
+    "test:local": "vitest run lib/fhevm.local.test.ts",
+    "test:e2e": "bash ../scripts/browser-e2e.sh"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@tanstack/react-query": "^5.100.11",
+    "@zama-fhe/sdk": "3.6.0",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "viem": "^2.38.3",
+    "wagmi": "^2.19.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.4.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.8.3",
+    "vitest": "3.2.4"
+  },
+  "overrides": {
+    "valtio": {
+      "use-sync-external-store": "^1.4.0"
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

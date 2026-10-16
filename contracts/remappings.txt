@@ -1,0 +1,5 @@
+@fhevm/solidity/=dependencies/@fhevm-solidity-0.11.1/
+encrypted-types/=dependencies/@encrypted-types-0.0.4/
+forge-fhevm/=dependencies/forge-fhevm-3ee696f/src/
+@fhevm/host-contracts/=dependencies/forge-fhevm-3ee696f/src/fhevm-host/
+forge-std/=dependencies/forge-std-1.14.0/src/
