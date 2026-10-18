@@ -163,11 +163,21 @@ Whole-function figures (`createSwitch` ~430k for a 52-byte secret, `markDark`
 ~81k, `revealKey` ~141–150k, all with one mock signer) are in
 [ARCHITECTURE.md §8](../ARCHITECTURE.md#8-gas).
 
+## Mainnet host (read 2026-10-18, block 26,221,790) ✅
+
+Read with `cast call` through a public mainnet RPC at the `ZamaEthereumConfig`
+addresses above. Read them again before the mainnet deploy: the host is
+upgradeable.
+
+| Contract | Value |
+| --- | --- |
+| `KMSVerifier` | `KMSVerifier v0.3.0`, 13 signers, `getThreshold()` = **7** (the same 7 of 13 as Sepolia; Zama's published 9-of-13 is the KMS's own decryption threshold, not the on-chain signature check) |
+| `ACL` | `ACL v0.4.0`, `paused()` = false, `owner()` = `0xB6D69D5F334d8B97B194617B53c6aB62f8681Ef3` |
+| `FHEVMExecutor` | `FHEVMExecutor v0.5.0` (≥ 0.3.0, so the 0.11.1 library pin is satisfied; see "Library version") |
+
 ## Not verified yet: needs Sepolia or mainnet ⏳
 
 - Live relayer latency from `makePubliclyDecryptable` to a servable proof.
 - Zama fee model for input verification and public decryption (who pays, and in what).
 - Relayer API-key issuance and rate limits.
-- Mainnet host executor version (affects only a future library upgrade, not this pin).
-- Mainnet `KMSVerifier` threshold and signer count (Zama publishes a 9-of-13 decryption threshold; Sepolia's `KMSVerifier` accepts 7 of 13 signatures, above), and who holds the ACL owner and pauser roles on mainnet.
 - The real relayer's job-id format and error shapes, and the mainnet `keyurl` key size.

@@ -46,4 +46,12 @@ recursive_deps = false
 #   getters and part of the ABI the frontend/client use.
 # - asm-keccak256, unwrapped-modifier-logic: micro-optimisations not worth the
 #   readability cost in a contract meant to be audited.
-exclude_lints = ["screaming-snake-case-immutable", "asm-keccak256", "unwrapped-modifier-logic"]
+# - block-timestamp (forge >= 1.6): comparing block.timestamp with the deadline
+#   is the contract's purpose; validator drift is bounded to the slot
+#   (ARCHITECTURE.md §7). Without this `make lint` fails on current Foundry.
+exclude_lints = [
+    "screaming-snake-case-immutable",
+    "asm-keccak256",
+    "unwrapped-modifier-logic",
+    "block-timestamp",
+]

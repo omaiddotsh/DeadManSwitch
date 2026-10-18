@@ -213,8 +213,9 @@ const str = (raw: Record<string, unknown>, k: string, def: string): string => {
 const amount = (raw: Record<string, unknown>, k: string, def: bigint, parse: (s: string) => bigint): bigint => {
   const v = raw[k];
   if (v === undefined) return def;
-  const s = typeof v === "number" ? String(v) : v;
-  if (typeof s !== "string" || !/^\d+(\.\d+)?$/.test(s)) throw new ConfigError(`watcher config: ${k} must be a non-negative decimal`);
+  // A JSON number is formatted without an exponent (String(0.0000001) is "1e-7"); strings are taken as written.
+  const s = typeof v === "number" && Number.isFinite(v) && v >= 0 ? v.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 18 }) : v;
+  if (typeof s !== "string" || !/^\d+(\.\d+)?$/.test(s)) throw new ConfigError(`watcher config: ${k} must be a non-negative decimal (quote it as a string to keep every digit)`);
   return parse(s);
 };
 

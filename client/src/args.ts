@@ -108,7 +108,8 @@ export const parseEth = (raw: string | undefined, what: string, opts: { allowZer
 
 export const parseOwner = (raw: string | undefined): Address => {
   if (raw === undefined) throw new UsageError("missing <owner>");
-  if (!isAddress(raw, { strict: false })) throw new UsageError(`<owner> must be an address, got "${raw}"`);
+  // viem's default (strict) check: all-lowercase is fine, mixed case must carry a valid EIP-55 checksum.
+  if (!isAddress(raw)) throw new UsageError(`<owner> must be an address (a mixed-case one must carry a valid EIP-55 checksum), got "${raw}"`);
   return getAddress(raw);
 };
 
@@ -173,6 +174,8 @@ const splitFlags = (argv: string[]): { positional: string[]; flags: Flags; seen:
         break;
       case "--out":
         flags.out = takePath(a);
+        // `--file -` reads stdin; there is no stdout counterpart, raw plaintext is never printed (see README).
+        if (flags.out === "-") throw new UsageError("--out - is not supported: give a file path (plaintext is never written raw to stdout)");
         seen.add("out");
         break;
       case "--publish":

@@ -9,10 +9,11 @@ no proxy, not upgradeable. Design, functions, trust model and gas:
 ```
 contracts/
 ├── src/DeadManSwitch.sol        the contract (inherits ZamaEthereumConfig)
-├── test/                        174 tests (158 on forge-fhevm's FhevmTest, 16 for the deploy script)
+├── test/                        181 tests (165 on forge-fhevm's FhevmTest, 16 for the deploy script)
 │   ├── utils/DMSTestBase.sol    harness: mock host, mock price feed, encrypt + KMS-decrypt helpers
 │   ├── Create.t.sol             29   PingFundCancel.t.sol  36   Release.t.sol  32
 │   ├── RescueAdmin.t.sol        44   FuzzInvariant.t.sol   16 (7 fuzz + 9 invariant)
+│   ├── Hardening.t.sol           7   review probes: KMS proof before markDark, cross-chain proof, feed quirks, floor cap
 │   ├── Deploy.t.sol             16   Deploy.s.sol: strict env parsing, chain-1 and signer guards
 │   └── DeadManSwitch.t.sol       1   lifecycle smoke test
 ├── script/Deploy.s.sol          deploy script (env-driven)
@@ -24,7 +25,7 @@ contracts/
 
 ## Toolchain and dependencies
 
-Foundry (tested with 1.5.1). Dependencies are managed by **Soldeer** and pinned in
+Foundry (tested with 1.5.1 and 1.7.1). Dependencies are managed by **Soldeer** and pinned in
 `foundry.toml` / `soldeer.lock`; there are no git submodules.
 
 | Dependency | Pin | Why |
@@ -44,7 +45,7 @@ lock use transient storage. `via_ir` is required for the multi-field
 make deps        # forge soldeer install
 make build       # forge build
 make sizes       # forge build --sizes   → runtime 14,029 bytes (EIP-170 limit 24,576)
-make test        # forge test -vv        → 174 passed
+make test        # forge test -vv        → 181 passed
 make gas         # rewrite .gas-snapshot (unit tests only; fuzz/invariant gas is not deterministic)
 make gas-check   # gas regression check: fails if any test moved more than 2%
 make fmt         # forge fmt
@@ -54,7 +55,7 @@ forge test --gas-report                  # per-function gas against the mock hos
 
 `make gas` and `make gas-check` skip the fuzz and invariant tests
 (`--no-match-test "testFuzz|invariant|test_Invariant"`), because their gas is
-not deterministic; the committed `.gas-snapshot` holds the other 153 tests.
+not deterministic; the committed `.gas-snapshot` holds the other 160 tests.
 Fuzz tests must be named `testFuzz_*` for the filter to catch them: a
 parameterised `test_*` puts a fuzz median in the snapshot, which shifts
 whenever unrelated test bytecode changes. A plain `forge snapshot --check`

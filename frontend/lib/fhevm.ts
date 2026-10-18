@@ -14,7 +14,7 @@
 //   forge-fhevm host stack at its canonical addresses). That path also works
 //   in Node, which the opt-in integration test uses.
 // - The first encryption in a browser needs Zama's FHE public key + CRS
-//   (~50 MB). We fetch it ourselves (keyurl via the proxy, then the public
+//   (~4.6 MB). We fetch it ourselves (keyurl via the proxy, then the public
 //   bucket URLs it names) so the UI can show byte progress, cache it in
 //   IndexedDB across visits, and hand it to the SDK as `fheEncryptionKey`.
 //   Public decryption does not need it.
@@ -38,7 +38,7 @@ export const isFhevmChain = (chainId: number | undefined | null): chainId is Fhe
 export type FhevmStage =
   | "loading-sdk"        // downloading/evaluating the SDK + WASM bundle
   | "fetching-key-info"  // GET keyurl via our relayer proxy
-  | "downloading-key"    // the ~50 MB FHE public key + CRS (byte progress available)
+  | "downloading-key"    // the ~4.6 MB FHE public key + CRS (byte progress available)
   | "key-cached"         // key loaded from this browser's IndexedDB cache
   | "initializing"       // SDK / WASM / worker init, on-chain protocol reads
   | "encrypting"         // ZK proof generation + relayer input-proof round trip
@@ -451,7 +451,7 @@ const idbGet = async (key: string): Promise<{ pk: Uint8Array; crs: Uint8Array } 
   }
 };
 
-/** Store the key for `chainId`, replacing any older key for that chain (keys rotate rarely; ~50 MB each). */
+/** Store the key for `chainId`, replacing any older key for that chain (keys rotate rarely; ~4.6 MB each). */
 const idbPut = async (chainId: number, key: string, value: { pk: Uint8Array; crs: Uint8Array }): Promise<void> => {
   const db = await idb();
   if (!db) return;
@@ -712,7 +712,7 @@ const logger = {
 };
 
 /**
- * One ZamaSDK per (chain, purpose). The decrypt instance never needs the 50 MB
+ * One ZamaSDK per (chain, purpose). The decrypt instance never needs the 4.6 MB
  * key; the encrypt instance on relayer chains is built with the prefetched key.
  * Shared (see "shared loads"). A failed build is evicted so the next call
  * starts clean (the SDK's own init does not self-recover).

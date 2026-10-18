@@ -3,6 +3,7 @@ import {
   BODY_LIMITS, FixedWindowRateLimiter, MAX_UPSTREAM_RETRIES, RATE_LIMITS, UpstreamFailures, allowedContractFor, handleRelayerRequest,
   matchRelayerPath, type Env, type ProxyDeps,
 } from "./proxy";
+import * as proxyModule from "./proxy";
 import { deploymentFor } from "@/lib/deployments";
 import * as route from "./[chainId]/[...path]/route";
 
@@ -169,18 +170,18 @@ describe("handleRelayerRequest — API key", () => {
 
   it("injects x-api-key upstream, to the default relayer, with only allowlisted headers", async () => {
     const d = deps();
-    const r = req("GET", "/api/relayer/11155111/v2/keyurl", {
+    const r = req("GET", "/api/relayer/1/v2/keyurl", {
       headers: {
         cookie: "session=abc", authorization: "Bearer user", "x-api-key": "client-supplied",
         "x-forwarded-for": "203.0.113.9", accept: "application/json",
         "zama-sdk-name": "@fhevm/sdk", "zama-sdk-version": "0.13.2", origin: "https://dms.example",
       },
     });
-    const res = await call(r, "11155111", ["v2", "keyurl"], d);
+    const res = await call(r, "1", ["v2", "keyurl"], d);
     expect(res.status).toBe(200);
     expect(d.fetch).toHaveBeenCalledTimes(1);
     const [url, init] = d.fetch.mock.calls[0]!;
-    expect(url).toBe("https://relayer.testnet.zama.org/v2/keyurl");
+    expect(url).toBe("https://relayer.mainnet.zama.org/v2/keyurl");
     expect(init?.method).toBe("GET");
     expect(init?.redirect).toBe("manual");
     expect(init?.cache).toBe("no-store");
@@ -213,10 +214,22 @@ describe("handleRelayerRequest — API key", () => {
         expect(res.status).toBe(200);
       }
       expect(d.fetch).toHaveBeenCalledTimes(2);
-      for (const [, init] of d.fetch.mock.calls) {
-        expect((init?.headers as Record<string, string>)["x-api-key"]).toBe(KEY);
-      }
+      // Mainnet needs the key and gets the global one; the open Sepolia relayer never sees it.
+      expect((d.fetch.mock.calls[0]![1]?.headers as Record<string, string>)["x-api-key"]).toBe(KEY);
+      expect(Object.keys(d.fetch.mock.calls[1]![1]?.headers as Record<string, string>)).not.toContain("x-api-key");
     }
+  });
+
+  it("the global key (the mainnet secret) is never sent to the Sepolia relayer, whose URL an operator can point anywhere", async () => {
+    const d = deps({ env: { ...baseEnv(), ZAMA_RELAYER_URL_11155111: "https://relayer.example.test" } });
+    expect((await call(req("GET"), "11155111", ["v2", "keyurl"], d)).status).toBe(200);
+    const [url, init] = d.fetch.mock.calls[0]!;
+    expect(url).toBe("https://relayer.example.test/v2/keyurl");
+    expect(JSON.stringify(init?.headers)).not.toContain(KEY);
+    // An explicit Sepolia key is sent.
+    const d2 = deps({ env: { ...baseEnv(), ZAMA_RELAYER_API_KEY_11155111: "sepolia-key" } });
+    await call(req("GET"), "11155111", ["v2", "keyurl"], d2);
+    expect((d2.fetch.mock.calls[0]![1]?.headers as Record<string, string>)["x-api-key"]).toBe("sepolia-key");
   });
 
   it("per-chain key is trimmed; blank per-chain key with no global key is still 503", async () => {
@@ -508,7 +521,8 @@ describe("handleRelayerRequest — upstream failures", () => {
 describe("rate limiting", () => {
   it("429 with Retry-After once a client exceeds its per-minute budget; other clients unaffected", async () => {
     const d = deps();
-    const from = (ip: string) => req("GET", "/", { headers: { "x-forwarded-for": `${ip}, 10.0.0.1` } });
+    // The edge appends the client's address: it is the LAST entry; the first came from the client.
+    const from = (ip: string) => req("GET", "/", { headers: { "x-forwarded-for": `10.0.0.1, ${ip}` } });
     for (let i = 0; i < RATE_LIMITS.keyurl; i++) {
       expect((await call(from("198.51.100.7"), "1", ["v2", "keyurl"], d)).status).toBe(200);
     }
@@ -570,8 +584,8 @@ describe("route.ts wiring", () => {
   it("GET proxies through global fetch with the key from process.env", async () => {
     const f = okUpstream();
     vi.stubGlobal("fetch", f);
-    const res = await route.GET(req("GET", "/api/relayer/11155111/v2/keyurl", { headers: { "x-forwarded-for": "192.0.2.50" } }), {
-      params: Promise.resolve({ chainId: "11155111", path: ["v2", "keyurl"] }),
+    const res = await route.GET(req("GET", "/api/relayer/1/v2/keyurl", { headers: { "x-forwarded-for": "192.0.2.50" } }), {
+      params: Promise.resolve({ chainId: "1", path: ["v2", "keyurl"] }),
     });
     expect(res.status).toBe(200);
     expect((f.mock.calls[0]![1]?.headers as Record<string, string>)["x-api-key"]).toBe(KEY);
@@ -599,5 +613,37 @@ describe("route.ts wiring", () => {
     });
     expect(res.status).toBe(200);
     expect(Object.keys(f.mock.calls[0]![1]?.headers as Record<string, string>)).not.toContain("x-api-key");
+  });
+});
+
+describe("client address behind trusted proxies", () => {
+  const { clientIp, trustedProxyHops } = proxyModule;
+  const xff = (v: string, extra: Record<string, string> = {}) => new Request("https://dms.example/", { headers: { "x-forwarded-for": v, ...extra } });
+
+  it("takes the entry the trusted edge appended (the last one by default), never the client's own", () => {
+    expect(clientIp(xff("spoofed, 203.0.113.9"))).toBe("203.0.113.9");
+    expect(clientIp(xff("203.0.113.9"))).toBe("203.0.113.9");
+    expect(clientIp(xff(" 1.1.1.1 ,  203.0.113.9 "))).toBe("203.0.113.9");
+  });
+
+  it("TRUSTED_PROXY_HOPS picks further left for a chain of trusted proxies, 0 ignores the header", () => {
+    expect(clientIp(xff("client, 203.0.113.9, 10.0.0.2"), { TRUSTED_PROXY_HOPS: "2" })).toBe("203.0.113.9");
+    expect(clientIp(xff("203.0.113.9"), { TRUSTED_PROXY_HOPS: "2" })).toBe("unknown"); // fewer entries than hops: not trusted
+    expect(clientIp(xff("spoofed", { "x-real-ip": "198.51.100.4" }), { TRUSTED_PROXY_HOPS: "0" })).toBe("198.51.100.4");
+    expect(trustedProxyHops({})).toBe(1);
+    expect(trustedProxyHops({ TRUSTED_PROXY_HOPS: "" })).toBe(1);
+    expect(trustedProxyHops({ TRUSTED_PROXY_HOPS: "garbage" })).toBe(1);
+    expect(trustedProxyHops({ TRUSTED_PROXY_HOPS: "-1" })).toBe(1);
+    expect(trustedProxyHops({ TRUSTED_PROXY_HOPS: "3" })).toBe(3);
+  });
+
+  it("a rotating fake first entry no longer escapes the per-IP limit", async () => {
+    const d = deps();
+    let allowed = 0;
+    for (let i = 1; i <= RATE_LIMITS.keyurl + 5; i++) {
+      const r = req("GET", "/", { headers: { "x-forwarded-for": `10.0.0.${i}, 203.0.113.9` } });
+      if ((await call(r, "1", ["v2", "keyurl"], d)).status !== 429) allowed++;
+    }
+    expect(allowed).toBe(RATE_LIMITS.keyurl);
   });
 });

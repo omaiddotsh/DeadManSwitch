@@ -77,7 +77,12 @@ const loadPlaintext = async (src: PlaintextSource, run: Run): Promise<Uint8Array
       throw new UserFacingError(`cannot read --file ${src.path}: ${(err as Error).message}`);
     }
     if (size > MAX_PAYLOAD_SIZE) throw new UserFacingError(`--file ${src.path} is ${size} bytes; the contract accepts at most ${MAX_PAYLOAD_SIZE}`);
-    bytes = new Uint8Array(await readFile(src.path));
+    try {
+      bytes = new Uint8Array(await readFile(src.path));
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      throw new UserFacingError(`cannot read --file ${src.path}: ${code === "EISDIR" ? "it is a directory" : (err as Error).message}`);
+    }
   }
   if (bytes.length === 0) throw new UserFacingError("plaintext is empty");
   assertPayloadSize(bytes);
@@ -580,7 +585,7 @@ const info: Handler<"info"> = async (c, run) => {
     ...(myStake !== undefined ? ([["your stake", fmtEth(myStake)]] as [string, string][]) : []),
     ["commitment", i.plaintextCommitment],
     ["key handle", i.encKeyHandle],
-    ["revealed key", i.revealedKey === `0x${"0".repeat(64)}` ? "-" : i.revealedKey],
+    ["revealed key", i.stateName === "REVEALED" ? i.revealedKey : "-"],
     ["ciphertext", `${i.ciphertextLength} bytes (${data.plaintextLength}-byte plaintext)`],
     ["published", i.published ? "yes" : "no"],
     ["rescuable", i.rescuable ? "yes" : `no${i.stateName === "DARK" || i.stateName === "DARK_MARKED" ? ` (from ${fmtTime(i.expiresAt + 30n * 86_400n)})` : ""}`],

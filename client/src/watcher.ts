@@ -35,7 +35,23 @@
 import dotenv from "dotenv";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  utimesSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -239,7 +255,9 @@ export const loadState = (path: string, chainId: number, contract: Address): Wat
   } catch (err) {
     throw new ConfigError(`state file ${path} is not valid JSON (${(err as Error).message}); move it aside to start fresh`);
   }
-  if (s.version !== 1 || typeof s.switches !== "object") throw new ConfigError(`state file ${path} has an unknown format`);
+  const shaped =
+    typeof s === "object" && s !== null && s.version === 1 && typeof s.chainId === "number" && typeof s.contract === "string" && typeof s.switches === "object" && s.switches !== null;
+  if (!shaped) throw new ConfigError(`state file ${path} has an unknown format; move it aside to start fresh`);
   if (s.chainId !== chainId || s.contract.toLowerCase() !== contract.toLowerCase()) {
     // Its transactions still pending hold this signer's nonces on this chain: every transaction a watcher with a
     // fresh state file sends waits behind them, and nothing would re-price or free them.
@@ -662,11 +680,31 @@ export const lockStateFile = (stateFile: string, envIn: Partial<LockEnv> = {}, o
   throw new ConfigError(`state file ${stateFile}: could not take ${path}. ${checkFirst}, and any ${path}.takeover-* file.`);
 };
 
-/** Write the state (or its JSON, already serialised) atomically: a temporary file, then a rename. */
+/**
+ * Write the state (or its JSON, already serialised) atomically and durably: a temporary file, fsync, rename,
+ * then fsync the directory. Without the fsyncs a power loss (not a process crash) shortly after the rename can
+ * leave an empty file on ext4/XFS, and with it every pendingTx's nonce bookkeeping.
+ */
 export const saveState = (path: string, s: WatcherState | string): void => {
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, typeof s === "string" ? s : JSON.stringify(s, null, 2), { mode: 0o600 });
+  const fd = openSync(tmp, "w", 0o600);
+  try {
+    writeSync(fd, typeof s === "string" ? s : JSON.stringify(s, null, 2));
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
   renameSync(tmp, path);
+  try {
+    const dir = openSync(dirname(path), "r");
+    try {
+      fsyncSync(dir);
+    } finally {
+      closeSync(dir);
+    }
+  } catch {
+    /* some file systems refuse to open or fsync a directory; the rename itself is still atomic */
+  }
 };
 
 // ---------- Watcher ---------- //

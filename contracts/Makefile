@@ -8,9 +8,11 @@ PRICE_FEED_ETHEREUM := 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
 PRICE_FEED_SEPOLIA  := 0x694AA1769357215DE4FAC081bf1f309aDC325306
 
 # Etherscan verification for the public deploy targets. VERIFY=0 deploys without it
-# (verify later with `forge verify-contract`, PRODUCTION-SETUP.md §4).
+# (verify later with `forge verify-contract`, PRODUCTION-SETUP.md §4). forge reads
+# ETHERSCAN_API_KEY from the environment itself (CHECK_VERIFY requires it); passing
+# it as an argument would show the key in the process list of the deploy host.
 VERIFY ?= 1
-VERIFY_FLAGS = $(if $(filter 0,$(VERIFY)),,--verify --etherscan-api-key $$ETHERSCAN_API_KEY)
+VERIFY_FLAGS = $(if $(filter 0,$(VERIFY)),,--verify)
 
 # Guards shared by the public deploy targets. None of them prints a secret.
 # forge also reads contracts/.env (a variable already set in the environment wins), so

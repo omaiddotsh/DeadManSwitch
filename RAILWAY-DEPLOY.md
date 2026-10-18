@@ -71,8 +71,9 @@ server route and never reaches the browser.
 | `NEXT_PUBLIC_PREVIOUS_CONTRACTS_11155111` / `_1` | build | after a redeploy on the same chain | Earlier deployments, comma-separated `<address>:<deploy block>` (e.g. `0xAbc…:7012345`). Their switches stay listed and usable (ping, cancel, top-up, release, reclaim); only creates go to the current contract. `next build` refuses a malformed entry. Never drop an address while a switch on it is not revealed or cancelled. |
 | `NEXT_PUBLIC_LOGS_RANGE_CAP` | build | no | Max blocks per `eth_getLogs` (default 5000). Set it at or below your provider's span limit. |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | build | yes, in practice | From cloud.reown.com. The code falls back to `"demo"`, which breaks mobile WalletConnect. |
-| `ZAMA_RELAYER_API_KEY` | runtime | mainnet only | **Secret.** Sent upstream as `x-api-key`. Zama's Sepolia relayer is open, so a Sepolia-only deploy needs no key. On mainnet, without it, `/api/relayer/1` answers `relayer_not_configured` (a 503 on `keyurl`, a 403 on the SDK's paths) and browsers cannot create switches or fetch keys. |
-| `ZAMA_RELAYER_API_KEY_11155111` / `_1` | runtime | no | Per-chain keys. When set to a non-empty value, they take precedence over `ZAMA_RELAYER_API_KEY` for that chain; an empty or blank value falls back to it. |
+| `ZAMA_RELAYER_API_KEY` | runtime | mainnet only | **Secret.** Sent upstream as `x-api-key` to the mainnet relayer only. Zama's Sepolia relayer is open, so a Sepolia-only deploy needs no key, and the proxy never sends this key to the Sepolia relayer (whose URL is operator-overridable). On mainnet, without it, `/api/relayer/1` answers `relayer_not_configured` (a 503 on `keyurl`, a 403 on the SDK's paths) and browsers cannot create switches or fetch keys. |
+| `ZAMA_RELAYER_API_KEY_11155111` / `_1` | runtime | no | Per-chain keys. When set to a non-empty value, they are sent for that chain; an empty or blank `_1` falls back to `ZAMA_RELAYER_API_KEY`. A Sepolia key is only ever sent from `_11155111`. |
+| `TRUSTED_PROXY_HOPS` | runtime | no | How many trusted proxies append to `X-Forwarded-For` in front of the app (default `1`: Railway's edge). The proxy's per-IP rate limit reads that entry, counted from the right; `0` ignores the header. |
 | `ZAMA_RELAYER_URL_11155111` / `_1` | runtime | no | Relayer override; https only. Defaults: `https://relayer.testnet.zama.org`, `https://relayer.mainnet.zama.org`. |
 | `NEXT_PUBLIC_ENABLE_LOCAL_CHAIN` | build | — | **Never set in production.** Enables chain 31337 for local development. |
 
@@ -99,8 +100,9 @@ Zama's bucket, not through Railway, and caches them in IndexedDB), and load
 
 - **Replicas.** The proxy's rate limit (per IP per minute: keyurl 30,
   input-proof 10, public-decrypt 20, polling 120) is held in memory per
-  instance and keyed on the first `X-Forwarded-For` entry, which Railway's
-  edge sets. Run one replica, or put a shared rate limiter in front.
+  instance and keyed on the `X-Forwarded-For` entry Railway's edge appends
+  (the last one; `TRUSTED_PROXY_HOPS` if there are more proxies in front). Run
+  one replica, or put a shared rate limiter in front.
 - **Logs.** `keyurl` answers a configuration error with a 503 and its label,
   and throttling or upstream failures with 429 / 502 / 504. The SDK's paths
   (input proof, public decrypt, their polls) answer the way the SDK retries

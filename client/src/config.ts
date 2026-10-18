@@ -70,7 +70,8 @@ export const parsePrivateKey = (raw: string | undefined): Hex | undefined => {
 
 export const parseAddress = (name: string, raw: string | undefined): Address => {
   if (!raw) throw new ConfigError(`${name} is required`);
-  if (!isAddress(raw, { strict: false })) throw new ConfigError(`${name} is not a valid address: "${raw}"`);
+  // viem's default (strict) check: all-lowercase is fine, mixed case must carry a valid EIP-55 checksum.
+  if (!isAddress(raw)) throw new ConfigError(`${name} is not a valid address (a mixed-case one must carry a valid EIP-55 checksum): "${raw}"`);
   return getAddress(raw);
 };
 

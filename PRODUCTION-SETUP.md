@@ -187,8 +187,8 @@ accounts). Quicker alternative for a throwaway testnet key only:
 If `--verify` fails, verify separately:
 
 ```bash
+# forge reads ETHERSCAN_API_KEY from the environment; do not pass it as an argument (it would show in `ps`)
 forge verify-contract $DMS src/DeadManSwitch.sol:DeadManSwitch --chain sepolia --watch \
-  --etherscan-api-key $ETHERSCAN_API_KEY \
   --constructor-args $(cast abi-encode "constructor(address,uint256,uint256)" $FEED 1000000000 7200)
 ```
 

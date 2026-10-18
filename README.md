@@ -43,7 +43,7 @@ Known limitations and how to report a vulnerability: [SECURITY.md](./SECURITY.md
 
 ## Quick start
 
-Requirements: [Foundry](https://getfoundry.sh) (tested with 1.5.1), Node 22,
+Requirements: [Foundry](https://getfoundry.sh) (tested with 1.5.1 and 1.7.1), Node 22,
 `jq`.
 
 ### Everything, locally, in one command

@@ -555,8 +555,8 @@ export class Dms {
       const usual = await this.fees();
       if (usual.maxFeePerGas >= fees.maxFeePerGas) throw err;
       opts.onNote?.(
-        `the balance does not cover gas at a max fee of ${formatGwei(fees.maxFeePerGas)} gwei (2 × base fee + tip); sent at ${formatGwei(usual.maxFeePerGas)} gwei ` +
-          "(1.2 × base fee + tip) instead, so a quick rise in the base fee can leave it pending",
+        `the balance does not cover gas at a max fee of ${formatGwei(fees.maxFeePerGas)} gwei (2 × base fee + tip); retrying at ${formatGwei(usual.maxFeePerGas)} gwei ` +
+          "(1.2 × base fee + tip), where a quick rise in the base fee can leave it pending",
       );
       sent = await this.send(functionName, args, { value, fees: usual, nonce: opts.nonce });
     }

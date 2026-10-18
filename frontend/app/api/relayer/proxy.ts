@@ -1,6 +1,8 @@
 // Server-side proxy to Zama's relayer. Injects the relayer API key so it never
 // reaches the browser. Only the mainnet relayer needs a key; Zama's Sepolia
-// relayer is open, so on Sepolia the key is optional and sent only when set. Framework-free (Fetch API Request/Response) so it can be
+// relayer is open, so the global ZAMA_RELAYER_API_KEY (a mainnet secret) is
+// never sent to it: a Sepolia key is sent only when given explicitly as
+// ZAMA_RELAYER_API_KEY_11155111. Framework-free (Fetch API Request/Response) so it can be
 // unit-tested; app/api/relayer/[chainId]/[...path]/route.ts is a thin wrapper.
 //
 // Surface — exactly what @zama-fhe/sdk 3.6.0 (→ @fhevm/sdk 0.13.2) calls for
@@ -35,7 +37,9 @@
 //     content-type / retry-after copied back, the key redacted from the body;
 //   - a JSON error when mainnet has no key (503 on keyurl; on the SDK's paths
 //     a labelled 403, see sdkAnswers); best-effort per-IP rate limit (per
-//     server instance); `cache-control: no-store` everywhere;
+//     server instance, the client IP taken from the X-Forwarded-For entry the
+//     trusted edge appended: TRUSTED_PROXY_HOPS from the right, default 1);
+//     `cache-control: no-store` everywhere;
 //   - on the SDK's paths the proxy's own throttles and upstream network
 //     failures are answered so the SDK waits and retries (a relayer-shaped
 //     429 on a POST, a 202 "queued" on a poll), not with a 429/502/504 that
@@ -126,10 +130,15 @@ export type Env = Record<string, string | undefined>;
 /**
  * The relayer API key for a chain. An empty or whitespace-only per-chain
  * variable counts as unset (dotenv loads `ZAMA_RELAYER_API_KEY_1=` as ""), so
- * it falls back to ZAMA_RELAYER_API_KEY instead of hiding it.
+ * it falls back to ZAMA_RELAYER_API_KEY instead of hiding it. The fallback
+ * applies only to chains whose relayer needs a key: the global variable is the
+ * mainnet secret, and the open Sepolia relayer (whose URL an operator can
+ * override) must never receive it.
  */
 export const apiKeyFor = (chainId: RelayerChainId, env: Env): string | undefined =>
-  env[`ZAMA_RELAYER_API_KEY_${chainId}`]?.trim() || env.ZAMA_RELAYER_API_KEY?.trim() || undefined;
+  env[`ZAMA_RELAYER_API_KEY_${chainId}`]?.trim() ||
+  (API_KEY_REQUIRED[chainId] ? env.ZAMA_RELAYER_API_KEY?.trim() : undefined) ||
+  undefined;
 
 export const relayerBaseFor = (chainId: RelayerChainId, env: Env): string => {
   const raw = env[`ZAMA_RELAYER_URL_${chainId}`]?.trim() || DEFAULT_RELAYER_URLS[chainId];
@@ -239,11 +248,32 @@ export class UpstreamFailures {
 
 const sharedUpstreamFailures = new UpstreamFailures();
 
-export const clientIp = (req: Request): string => {
+/**
+ * How many trusted proxies append to X-Forwarded-For in front of this server
+ * (TRUSTED_PROXY_HOPS, default 1: Railway's edge, or any single reverse proxy).
+ * 0 means no trusted proxy: the header is ignored.
+ */
+export const trustedProxyHops = (env: Env): number => {
+  const raw = env.TRUSTED_PROXY_HOPS?.trim();
+  if (raw === undefined || raw === "") return 1;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 16 ? n : 1;
+};
+
+/**
+ * The client's address for the rate limiter and the upstream-failure budget.
+ * A proxy appends the address it saw to X-Forwarded-For, so the entry the
+ * outermost trusted proxy wrote is the n-th from the RIGHT; everything left of
+ * it came from the client and can be set freely (a rotating fake first entry
+ * would otherwise defeat the per-IP limit). Falls back to X-Real-IP.
+ */
+export const clientIp = (req: Request, env: Env = {}): string => {
+  const hops = trustedProxyHops(env);
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first.slice(0, 64);
+  if (xff && hops > 0) {
+    const entries = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    const trusted = entries[entries.length - hops];
+    if (trusted) return trusted.slice(0, 64);
   }
   return (req.headers.get("x-real-ip") ?? "unknown").trim().slice(0, 64) || "unknown";
 };
@@ -456,7 +486,7 @@ export const handleRelayerRequest = async (
     return configError("relayer_misconfigured", (e as Error).message);
   }
 
-  const retryAfter = limiter.take(`${clientIp(req)}|${chainId}|${op.bucket}`, RATE_LIMITS[op.bucket], now);
+  const retryAfter = limiter.take(`${clientIp(req, env)}|${chainId}|${op.bucket}`, RATE_LIMITS[op.bucket], now);
   if (retryAfter > 0) {
     return sdk ? sdk.retry("rate_limited", "rate limited by this server", retryAfter)
       : json(429, { error: "rate limited" }, { "retry-after": String(retryAfter) });
@@ -526,7 +556,7 @@ export const handleRelayerRequest = async (
   const failures = deps.upstreamFailures ?? sharedUpstreamFailures;
   // Polls: per job. POSTs: per request body (the SDK re-posts the same one), not per client: users behind one
   // IP (an office, a carrier NAT) must not use up each other's retries.
-  const failKey = `${clientIp(req)}|${chainId}|${op.kind}|${op.kind === "poll" ? op.jobId : await bodyDigest(upstreamBody)}`;
+  const failKey = `${clientIp(req, env)}|${chainId}|${op.kind}|${op.kind === "poll" ? op.jobId : await bodyDigest(upstreamBody)}`;
   const upstreamFailed = (timedOut: boolean, what: string): Response =>
     sdk && failures.fail(failKey, now) <= MAX_UPSTREAM_RETRIES
       ? sdk.retry("protocol_overload", timedOut ? "relayer timed out" : what, UPSTREAM_RETRY_AFTER_S)
